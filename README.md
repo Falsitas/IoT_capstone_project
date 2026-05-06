@@ -38,7 +38,7 @@ code .
 5. 즐겁게 연주!
 
 ## 3. 회로 구성
-(TODO: 회로 설계도 추가)
+<img src="./assets/img/circuit.png">
 
 ## 4. 기능 및 사용 방법
 
