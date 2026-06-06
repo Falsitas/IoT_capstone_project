@@ -1,0 +1,227 @@
+#ifndef __TUNE_H__
+#define __TUNE_H__
+
+// MIDI note number for piano keys (A0 to C8)
+#define A0  21
+#define As0 22
+#define Bn0  23
+#define C1  24
+#define Cs1 25
+#define D1  26
+#define Ds1 27
+#define E1  28
+#define F1  29
+#define Fs1 30
+#define G1  31
+#define Gs1 32
+#define A1  33
+#define As1 34
+#define Bn1  35
+#define C2  36
+#define Cs2 37
+#define D2  38
+#define Ds2 39
+#define E2  40
+#define F2  41
+#define Fs2 42
+#define G2  43
+#define Gs2 44
+#define A2  45
+#define As2 46
+#define B2  47
+#define C3  48
+#define Cs3 49
+#define D3  50
+#define Ds3 51
+#define E3  52
+#define F3  53
+#define Fs3 54
+#define G3  55
+#define Gs3 56
+#define A3  57
+#define As3 58
+#define B3  59
+#define C4  60
+#define Cs4 61
+#define D4  62
+#define Ds4 63
+#define E4  64
+#define F4  65
+#define Fs4 66
+#define G4  67
+#define Gs4 68
+#define A4  69
+#define As4 70
+#define B4  71
+#define C5  72
+#define Cs5 73
+#define D5  74
+#define Ds5 75
+#define E5  76
+#define F5  77
+#define Fs5 78
+#define G5  79
+#define Gs5 80
+#define A5  81
+#define As5 82
+#define B5  83
+#define C6  84
+#define Cs6 85
+#define D6  86
+#define Ds6 87
+#define E6  88
+#define F6  89
+#define Fs6 90
+#define G6  91
+#define Gs6 92
+#define A6  93
+#define As6 94
+#define B6  95
+#define C7  96
+#define Cs7 97
+#define D7  98
+#define Ds7 99
+#define E7  100
+#define F7  101
+#define Fs7 102
+#define G7  103
+#define Gs7 104
+#define A7  105
+#define As7 106
+#define B7  107
+#define C8  108
+
+// Note frequencies for MIDI notes 0-127
+// index corresponds to MIDI note number, value is frequency in Hz
+double noteFrequencies[] = {
+  8.18, // C-1, MIDI 0~
+  8.66, // C#-1/Db-1
+  9.18, // D-1
+  9.72, // D#-1/Eb-1
+  10.30, // E-1
+  10.91, // F-1
+  11.56, // F#-1/Gb-1
+  12.25, // G-1
+  12.98, // G#-1/Ab-1
+  13.75, // A-1
+  14.57, // A#-1/Bb-1
+  15.43, // B-1
+  16.35, // C0
+  17.32, // C#0/Db0
+  18.35, // D0
+  19.45, // D#0/Eb0
+  20.60, // E0
+  21.83, // F0
+  23.12, // F#0/Gb0
+  24.50, // G0
+  25.96, // G#0/Ab0
+  27.50, // A0
+  29.14, // A#0/Bb0
+  30.87, // B0
+  32.70, // C1
+  34.65, // C#1/Db1
+  36.71, // D1
+  38.89, // D#1/Eb1
+  41.20, // E1
+  43.65, // F1
+  46.25, // F#1/Gb1
+  49.00, // G1
+  51.91, // G#1/Ab1
+  55.00, // A1
+  58.27, // A#1/Bb1
+  61.74, // B1
+  65.41, // C2
+  69.30, // C#2/Db2
+  73.42, // D2
+  77.78, // D#2/Eb2
+  82.41, // E2
+  87.31, // F2
+  92.50, // F#2/Gb2
+  98.00, // G2
+  103.83, // G#2/Ab2
+  110.00, // A2
+  116.54, // A#2/Bb2
+  123.47, // B2
+  130.81, // C3
+  138.59, // C#3/Db3
+  146.83, // D3
+  155.56, // D#3/Eb3
+  164.81, // E3
+  174.61, // F3
+  185.00, // F#3/Gb3
+  196.00, // G3
+  207.65, // G#3/Ab3
+  220.00, // A3
+  233.08, // A#3/Bb3
+  246.94, // B3
+  261.63, // C4 (Middle C)
+  277.18, // C#4/Db4
+  293.66, // D4
+  311.13, // D#4/Eb4
+  329.63, // E4
+  349.23, // F4
+  369.99, // F#4/Gb4
+  392.00, // G4
+  415.30, // G#4/Ab4
+  440.00, // A4
+  466.16, // A#4/Bb4
+  493.88, // B4
+  523.25, // C5
+  554.37, // C#5/Db5
+  587.33, // D5
+  622.25, // D#5/Eb5
+  659.25, // E5
+  698.46, // F5
+  739.99, // F#5/Gb5
+  783.99, // G5
+  830.61, // G#5/Ab5
+  880.00, // A5
+  932.33, // A#5/Bb5
+  987.77, // B5
+  1046.50, // C6
+  1108.73, // C#6/Db6
+  1174.66, // D6
+  1244.51, // D#6/Eb6
+  1318.51, // E6
+  1396.91, // F6
+  1479.98, // F#6/Gb6
+  1567.98, // G6
+  1661.22, // G#6/Ab6
+  1760.00, // A6
+  1864.66, // A#6/Bb6
+  1975.53, // B6
+  2093.00, // C7
+  2217.46, // C#7/Db7
+  2349.32, // D7
+  2489.02, // D#7/Eb7
+  2637.02, // E7
+  2793.83, // F7
+  2959.96, // F#7/Gb7
+  3135.96, // G7
+  3322.44, // G#7/Ab7
+  3520.00, // A7
+  3729.31, // A#7/Bb7
+  3951.07, // B7
+  4186.01, // C8
+  4434.92, // C#8/Db8
+  4698.63, // D8
+  4978.03, // D#8/Eb8
+  5274.04, // E8
+  5587.65, // F8
+  5919.91, // F#8/Gb8
+  6271.93, // G8
+  6644.88, // G#8/Ab8
+  7040.00, // A8
+  7458.62, // A#8/Bb8
+  7902.13, // B8
+  8372.02, // C9
+  8869.84, // C#9/Db9
+  9397.27, // D9
+  9956.06, // D#9/Eb9
+  10548.08, // E9
+  11175.30, // F9
+  11839.82, // F#9/Gb9
+  12543.85, // G9
+};
+
+#endif // __TUNE_H__
