@@ -2,6 +2,7 @@
 #include <NewPing.h>
 #include <LiquidCrystal_I2C.h>
 #include <driver/i2s.h>
+#include <Wire.h>
 
 #include "audio_wave.h"
 #include "Tune.h"
@@ -11,7 +12,7 @@
  * Macros *
  **********/
 
-#define VERBOSE true
+#define VERBOSE 0
 
 // HC-SR04 ultrasonic sensor
 #define TRIGGER_PIN 5
@@ -29,16 +30,16 @@
 #define AUDIO_SAMPLE_RATE 44100  // Hz
 
 // Potentiometer
-#define POTENTIOMETER_PIN 1
+#define POTENTIOMETER_PIN 20
 
 // Rotary encoder
-#define ENCODER_CLK_PIN 40
-#define ENCODER_DT_PIN 41
-#define ENCODER_SW_PIN 42
+#define ROTARY_CLK_PIN 40
+#define ROTARY_DT_PIN 41
+#define ROTARY_SW_PIN 42
 
 // LCD display
-#define LCD_SDA_PIN 8
-#define LCD_SCL_PIN 9
+#define LCD_SDA_PIN 1
+#define LCD_SCL_PIN 2
 #define LCD_ADDRESS 0x27
 #define LCD_COLUMNS 16
 #define LCD_ROWS 2
@@ -66,6 +67,9 @@ void showCurrentWaveType();
 // HC-SR04 functions
 unsigned int distanceToMidiNote(unsigned int distance);
 
+// Rotary encoder functions
+void rotaryControl();
+
 
 /*********************
  * Global variables *
@@ -76,6 +80,15 @@ volatile float phase = 0.0f;
 volatile int16_t volume = 3000; // -32768 to 32,767 for 16-bit audio
 volatile WaveType currentWaveType = SINE; // Default wave type
 
+// flag to indicate if wave type has changed (for LCD update)
+bool isWaveTypeChanged = true; // initialize to true so that LCD shows wave type on startup
+
+// potentiometer
+int16_t pot;
+
+// rotary encoder
+int lastCLK;
+
 // Initialize instances
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
@@ -84,7 +97,8 @@ LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
 
 void setup() {
   Serial.begin(115200);
-  if (VERBOSE) {
+
+  #if VERBOSE
     Serial.println("Starting Simple Synthesizer with");
     Serial.print("volume: ");
     Serial.print(volume);
@@ -101,43 +115,116 @@ void setup() {
         break;
     }
     Serial.println("Starting setup...");
-  }
+  #endif
 
   // Initialize LCD
+  Wire.begin(LCD_SDA_PIN, LCD_SCL_PIN);
   lcd.init();
   lcd.backlight();
-  if (VERBOSE) {
+  #if VERBOSE
     Serial.println("LCD initialized");
-  }
+  #endif
 
   // show welcome message and prepare
   showWelcomeMessage();
-  if (VERBOSE) {
+  #if VERBOSE
     Serial.println("Welcome message displayed");
-  }
+  #endif
+
+  // set pin mode for potentiometer
+  pinMode(POTENTIOMETER_PIN, INPUT);
+  #if VERBOSE
+    Serial.print("Potentiometer pin initialized");
+  #endif
+
+  // set pin mode for rotary encoder
+  pinMode(ROTARY_CLK_PIN, INPUT);
+  pinMode(ROTARY_DT_PIN, INPUT);
+  pinMode(ROTARY_SW_PIN, INPUT);
+  lastCLK = digitalRead(ROTARY_CLK_PIN);
+  #if VERBOSE
+    Serial.println("Rotary encoder pins initialized");
+  #endif
 
   // Initialize I2S for audio output
   i2sInit();
-  if (VERBOSE) {
+  #if VERBOSE
     Serial.println("I2S initialized");
-  }
+  #endif
 
   // Create audio task on core 0 (parallel to main loop)
   // xTaskCreatePinnedToCore(audioTask, "Audio Task", 4096, NULL, 2, NULL, 1);
-  if (VERBOSE) {
+  #if VERBOSE
     Serial.println("Audio task created");
-  }
+  #endif
 }
 
 void loop() {
-  // change frequency based on distance measured by HC-SR04   
-  if (VERBOSE) {
-     Serial.println("start loop...\n");
+  // i2c scan code
+  // byte error, address;
+  // int nDevices = 0;
+
+  // Serial.println("Scanning...");
+
+  // for(address = 1; address < 127; address++) {
+  //   Wire.beginTransmission(address);
+  //   error = Wire.endTransmission();
+
+  //   if(error == 0) {
+  //     Serial.print("I2C device found at 0x");
+  //     if(address < 16) Serial.print("0");
+  //     Serial.println(address, HEX);
+  //     nDevices++;
+  //   }
+  // }
+
+  // if(nDevices == 0)
+  //   Serial.println("No I2C devices found");
+
+  // delay(5000);
+ 
+  // display wave type selected if changed
+  // initially display once (default: SINE)
+  if (isWaveTypeChanged) {
+    #if VERBOSE
+      Serial.print("Wave type changed to: ");
+      switch (currentWaveType) {
+        case SINE:
+          Serial.println("SINE");
+          break;
+        case SQUARE:
+          Serial.println("SQUARE");
+          break;
+        case SAW:
+          Serial.println("SAW");
+          break;
+      }
+    #endif
+    showCurrentWaveType();
+    isWaveTypeChanged = false;
   }
-  if (VERBOSE) {
+
+  // set volume
+  #if VERBOSE
+    pot = analogRead(POTENTIOMETER_PIN);
+    Serial.print("current potentiometer: ");
+    Serial.print(pot);
+    volume = map(pot, 0, 4095, 0, 127) * 258;
+    Serial.print(", to volume: ");
+    Serial.println(volume);
+  #else
+    volume = map(analogRead(POTENTIOMETER_PIN), 0, 4095, 0, 127) * 258;
+  #endif
+
+  // set wave
+  rotaryControl();
+
+  // change frequency based on distance measured by HC-SR04  
+  #if VERBOSE
     unsigned int distance = sonar.ping_cm();
     unsigned int midiNote = distanceToMidiNote(distance);
     double frequency = noteFrequencies[midiNote];
+    
     Serial.print("Distance: ");
     Serial.print(distance);
     Serial.print(" cm, MIDI Note: ");
@@ -145,11 +232,14 @@ void loop() {
     Serial.print(", Frequency: ");
     Serial.print(frequency);
     Serial.println();
+    Serial.println();
     currentFrequency = frequency;
-  } else {
+  #else
     currentFrequency = noteFrequencies[distanceToMidiNote(sonar.ping_cm())];
-  }
-  delay(100); // small delay to avoid flooding serial output
+  #endif
+
+
+  // delay(100); // small delay to avoid flooding serial output
 }
 
 
@@ -265,4 +355,29 @@ unsigned int distanceToMidiNote(unsigned int distance) {
   if (distance > MAX_DISTANCE) distance = MAX_DISTANCE; // cap at max distance
   else if (distance < MIN_DISTANCE) distance = MIN_DISTANCE; // cap at min distance
   return map(distance, MIN_DISTANCE, MAX_DISTANCE, A0, C8); // A0 to C8 (piano range)
+}
+
+
+/****************************
+ * Rotary Encoder Functions *
+ ****************************/
+void rotaryControl() {
+  int clk = digitalRead(ROTARY_CLK_PIN);
+
+  if(clk != lastCLK) {
+    if(clk != digitalRead(ROTARY_DT_PIN)) {
+      #if VERBOSE
+        Serial.println("Encoder moved CW");
+      #endif
+      currentWaveType = (WaveType)((currentWaveType + 1) % 3); // modulo to avoid overflow
+    }
+    else {
+      #if VERBOSE
+        Serial.println("Encoder moved CCW");
+      #endif
+      currentWaveType = (WaveType)((currentWaveType + 2) % 3); // -1 equals to -1+n. addition to prevent negative.
+    }
+    isWaveTypeChanged = true;
+    lastCLK = clk;
+  }
 }
