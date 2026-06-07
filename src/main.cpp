@@ -6,6 +6,7 @@
 
 #include "audio_wave.h"
 #include "Tune.h"
+#include "custom_ble.h"
 
 
 /**********
@@ -89,9 +90,14 @@ int16_t pot;
 // rotary encoder
 int lastCLK;
 
+// ble
+bool isRecording = false;
+bool isPlaying = false;
+
 // Initialize instances
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
+CustomBLE ble;
 
 
 
@@ -144,6 +150,12 @@ void setup() {
   lastCLK = digitalRead(ROTARY_CLK_PIN);
   #if VERBOSE
     Serial.println("Rotary encoder pins initialized");
+  #endif
+
+  // setup BLE
+  ble.begin();
+  #if VERBOSE
+    Serial.println("BLE initialized");
   #endif
 
   // Initialize I2S for audio output
@@ -218,6 +230,29 @@ void loop() {
 
   // set wave
   rotaryControl();
+
+  // BLE
+  if(ble.recStartRequested) {
+    #if VERBOSE
+      Serial.println("\nREC_START\n");
+    #endif
+    isRecording = true;
+    ble.recStartRequested = false;
+  }
+  if(ble.recStopRequested) {
+    #if VERBOSE
+      Serial.println("\nREC_STOP\n");
+    #endif
+    isRecording = false;
+    ble.recStopRequested = false;
+  }
+  if(ble.playStopRequested) {
+    #if VERBOSE
+      Serial.println("\nPLAY_STOP\n");
+    #endif
+    isPlaying = !isPlaying;
+    ble.playStopRequested = false;
+  }
 
   // change frequency based on distance measured by HC-SR04  
   #if VERBOSE
