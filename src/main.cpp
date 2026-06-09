@@ -22,6 +22,30 @@
 #define MIN_DISTANCE 5    // Minimum distance to avoid noise (in cm)
 #define MAX_DISTANCE 100  // Maximum distance to measure (in cm)
 
+// start-end note
+#define KEYCOUNT 0
+// 0 : 25keys
+// 1 : 37keys
+// 2 : 49keys
+// 3 : 61keys
+// 4 : 88keys
+#if KEYCOUNT == 0
+#define START_NOTE C_4
+#define END_NOTE C_6
+#elif KEYCOUNT == 1
+#define START_NOTE C_4
+#define END_NOTE C_7
+#elif KEYCOUNT == 2
+#define START_NOTE C_3
+#define END_NOTE C_7
+#elif KEYCOUNT == 3
+#define START_NOTE C_2
+#define END_NOTE C_7
+#elif KEYCOUNT == 4
+#define START_NOTE A_0
+#define END_NOTE C_8
+#endif
+
 // MAX98357A I2S audio amplifier
 #define LRC_PIN 18
 #define BCLK_PIN 17
@@ -436,7 +460,7 @@ void showCurrentWaveType() {
 unsigned int distanceToMidiNote(unsigned int distance) {
   if (distance > MAX_DISTANCE) distance = MAX_DISTANCE; // cap at max distance
   else if (distance < MIN_DISTANCE) distance = MIN_DISTANCE; // cap at min distance
-  return map(distance, MIN_DISTANCE, MAX_DISTANCE, C2, C7); // C2 to C7 (61keys range)
+  return map(distance, MIN_DISTANCE, MAX_DISTANCE, START_NOTE, END_NOTE); // C2 to C7 (61keys range)
   // return map(distance, MIN_DISTANCE, MAX_DISTANCE, A0, C8); // A0 to C8 (88keys piano range)
 }
 
