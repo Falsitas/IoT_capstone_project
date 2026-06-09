@@ -13,6 +13,7 @@ void CustomBLE::begin() {
 
   pCharacteristic = pService->createCharacteristic(BLE_CHAR_UUID, NIMBLE_PROPERTY::WRITE);
 
+  pServer->setCallbacks(this);
   pCharacteristic->setCallbacks(this);
 
   pService->start();
@@ -31,13 +32,18 @@ void CustomBLE::onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo& co
   cmd.trim();
   cmd.toUpperCase();
 
-  if (cmd == "REC_START") {
-      recStartRequested = true;
+  if (cmd == "REC") {
+    recRequested = true;
+  } else if (cmd == "PLAY") {
+    playStopRequested = true;
   }
-  else if (cmd == "REC_STOP") {
-      recStopRequested = true;
-  }
-  else if (cmd == "PLAY_STOP") {
-      playStopRequested = true;
-  }
+}
+
+void CustomBLE::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) {
+  digitalWrite(LED_BUILTIN, HIGH);
+}
+
+void CustomBLE::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
+  digitalWrite(LED_BUILTIN, LOW);
+  NimBLEDevice::startAdvertising();
 }

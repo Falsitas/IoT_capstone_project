@@ -7,6 +7,7 @@
 #include "audio_wave.h"
 #include "Tune.h"
 #include "custom_ble.h"
+#include "record_event.h"
 
 
 /**********
@@ -54,6 +55,11 @@
 #define PLAYBACK_SWITCH_PIN 36
 #define STOP_SWITCH_PIN 37
 
+// record
+#define MAX_EVENTS 1024
+#define RECORD_LED_PIN 36
+#define PLAYING_LED_PIN 35
+
 
 /***********************
  * Function prototypes *
@@ -63,6 +69,7 @@
 void i2sInit();
 int16_t generateSample(WaveType type, float phase, int16_t amplitude);
 void generateAudio();
+void playBackAudio();
 void audioTask(void *parameter);
 
 // LCD display functions
@@ -76,6 +83,13 @@ void pingTask(void *parameter);
 // Rotary encoder functions
 void rotaryControl();
 
+// recording functions
+void startRecording();
+void stopRecording();
+void startPlayBack();
+void stopPlayBack();
+void playBackTask(void* parameter);
+
 
 /*********************
  * Global variables *
@@ -88,9 +102,9 @@ volatile WaveType currentWaveType = SINE; // Default wave type
 int16_t buffer[SAMPLES * 2]; // stereo buffer (left + right)
 
 // note change by HC-SR04
-int stableNote = -1;
-int candidateNote = -1;
-int sameCount = 0;
+int8_t stableNote = -1;
+int8_t candidateNote = -1;
+uint8_t sameCount = 0;
 
 // flag to indicate if wave type has changed (for LCD update)
 bool isWaveTypeChanged = true; // initialize to true so that LCD shows wave type on startup
@@ -101,9 +115,13 @@ int16_t pot;
 // rotary encoder
 int lastCLK;
 
-// ble
+// ble-record
 bool isRecording = false;
 bool isPlaying = false;
+NoteEvent recorded[MAX_EVENTS];
+uint16_t eventCount = 0;
+uint32_t recordStartTime;
+TaskHandle_t playTaskHandler = NULL;
 
 // Initialize instances
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
@@ -165,6 +183,21 @@ void setup() {
 
   // setup BLE
   ble.begin();
+  // set LED pins
+  pinMode(RECORD_LED_PIN, OUTPUT);
+  pinMode(PLAYING_LED_PIN, OUTPUT);
+  digitalWrite(BUILTIN_LED, HIGH);
+  delay(250);
+  digitalWrite(BUILTIN_LED, LOW);
+  delay(250);
+  digitalWrite(RECORD_LED_PIN, HIGH);
+  delay(250);
+  digitalWrite(RECORD_LED_PIN, LOW);
+  delay(250);
+  digitalWrite(PLAYING_LED_PIN, HIGH);
+  delay(250);
+  digitalWrite(PLAYING_LED_PIN, LOW);
+  delay(250);
   #if VERBOSE
     Serial.println("BLE initialized");
   #endif
@@ -248,49 +281,16 @@ void loop() {
   rotaryControl();
 
   // BLE
-  if(ble.recStartRequested) {
-    #if VERBOSE
-      Serial.println("\nREC_START\n");
-    #endif
-    isRecording = true;
-    ble.recStartRequested = false;
-  }
-  if(ble.recStopRequested) {
-    #if VERBOSE
-      Serial.println("\nREC_STOP\n");
-    #endif
-    isRecording = false;
-    ble.recStopRequested = false;
+  if(ble.recRequested) {
+    ble.recRequested = false;
+    if(isRecording) stopRecording();
+    else startRecording();
   }
   if(ble.playStopRequested) {
-    #if VERBOSE
-      Serial.println("\nPLAY_STOP\n");
-    #endif
-    isPlaying = !isPlaying;
     ble.playStopRequested = false;
+    if(isPlaying) stopPlayBack();
+    else startPlayBack();
   }
-
-  // // change frequency based on distance measured by HC-SR04  
-  // #if VERBOSE
-  //   unsigned int distance = sonar.ping_cm();
-  //   unsigned int midiNote = distanceToMidiNote(distance);
-  //   double frequency = noteFrequencies[midiNote];
-    
-  //   Serial.print("Distance: ");
-  //   Serial.print(distance);
-  //   Serial.print(" cm, MIDI Note: ");
-  //   Serial.print(midiNote);
-  //   Serial.print(", Frequency: ");
-  //   Serial.print(frequency);
-  //   Serial.println();
-  //   Serial.println();
-  //   currentFrequency = frequency;
-  // #else
-  //   currentFrequency = noteFrequencies[distanceToMidiNote(sonar.ping_cm())];
-  // #endif
-
-  // generateAudio();
-  // delay(100); // small delay to avoid flooding serial output
 }
 
 
@@ -360,8 +360,40 @@ void generateAudio() {
   i2s_write(I2S_PORT, buffer, sizeof(buffer), &bytesWritten, portMAX_DELAY);
 }
 
+void playBackAudio(uint32_t duration, int8_t note) {
+  const int sampleRate = AUDIO_SAMPLE_RATE;
+  const int chunk = 256;
+  uint32_t samples = sampleRate * duration / 1000;
+  int16_t buffer[chunk * 2];
+  float phaseStep = 2.0f * PI * noteFrequencies[note] / sampleRate;
+  size_t bytesWritten = 0;
+
+  while(samples > 0) {
+    int n = (samples > chunk) ? chunk : samples;
+    
+    for (int i = 0; i < n; i++) {
+      // generate sample based on current wave type
+      int16_t s = generateSample(currentWaveType, phase, volume);
+
+      // update phase, wrap around at 2*PI
+      phase += phaseStep;
+      if (phase >= 2.0f * PI) phase -= 2.0f * PI;
+
+      // write sample to both left and right channels
+      buffer[i * 2]     = s;  // Left
+      buffer[i * 2 + 1] = s;  // Right
+    }
+    i2s_write(I2S_PORT, buffer, sizeof(buffer), &bytesWritten, portMAX_DELAY);
+    samples -= n;
+  }
+}
+
 void audioTask(void *parameter) {
   while (true) {
+    if(isPlaying) {
+      vTaskDelay(20);
+      continue;
+    }
     generateAudio();
     // vTaskDelay(1); // small delay to yield to other tasks (if needed)
   }
@@ -410,6 +442,12 @@ unsigned int distanceToMidiNote(unsigned int distance) {
 
 void pingTask(void *parameter) {
   while(true) {
+    // no need to ping while play back
+    if(isPlaying) {
+      vTaskDelay(20);
+      continue;
+    }
+
     int newNote = distanceToMidiNote(sonar.ping_cm());
     if (newNote == candidateNote) {
       sameCount++;
@@ -418,8 +456,15 @@ void pingTask(void *parameter) {
       sameCount = 1;
     }
 
+    // stable change for the notes prevent fluctuation
     if (sameCount >= 3 && stableNote != candidateNote) {
       stableNote = candidateNote;
+      // if recording
+      if(isRecording && eventCount < MAX_EVENTS) {
+        recorded[eventCount].timestamp = millis() - recordStartTime;
+        recorded[eventCount].note = stableNote;
+        eventCount++;
+      }
       currentFrequency = noteFrequencies[stableNote];
     }
     
@@ -450,4 +495,71 @@ void rotaryControl() {
     isWaveTypeChanged = true;
     lastCLK = clk;
   }
+}
+
+
+/***********************
+ * recording functions *
+ ***********************/
+void startRecording() {
+  #if VERBOSE
+    Serial.println("Recording started");
+  #endif
+  // recording first, kill playback and start new recording
+  if(isPlaying) {
+    stopPlayBack();
+  }
+  isRecording = true;
+  digitalWrite(RECORD_LED_PIN, HIGH);
+  eventCount = 0;
+  recordStartTime = millis();
+
+  // record first note
+  recorded[eventCount++] = {0, stableNote};
+}
+
+void stopRecording() {
+  #if VERBOSE
+    Serial.println("Recording stopped");
+  #endif
+  isRecording = false;
+  digitalWrite(RECORD_LED_PIN, LOW);
+
+  // record finish time, -1 for the note since there is no meaning of recording stable note
+  recorded[eventCount++] = {millis() - recordStartTime, -1};
+}
+
+void startPlayBack() {
+  #if VERBOSE
+    Serial.println("Playback started");
+  #endif
+  // playback is not allowed when recording
+  if(isRecording) {
+    return;
+  }
+  isPlaying = true;
+  digitalWrite(PLAYING_LED_PIN, HIGH);
+  xTaskCreatePinnedToCore(playBackTask, "Play Task", STACK_DEPTH, NULL, 1, &playTaskHandler, 1);
+}
+
+void stopPlayBack() {
+  #if VERBOSE
+    Serial.println("Playback stopped");
+  #endif
+  isPlaying = false;
+  digitalWrite(PLAYING_LED_PIN, LOW);
+  vTaskDelete(playTaskHandler);
+  playTaskHandler = NULL;
+}
+
+void playBackTask(void* parameter) {
+  int currentCount = 0;
+  while(currentCount < eventCount-1) {
+    playBackAudio(recorded[currentCount+1].timestamp - recorded[currentCount].timestamp, recorded[currentCount].note);
+    currentCount++;
+  }
+  // end of playback
+  isPlaying = false;
+  digitalWrite(PLAYING_LED_PIN, LOW);
+  vTaskDelete(NULL);
 }
