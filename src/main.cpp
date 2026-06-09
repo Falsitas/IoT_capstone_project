@@ -29,6 +29,10 @@
 
 // audio settings
 #define AUDIO_SAMPLE_RATE 44100  // Hz
+#define SAMPLES 128
+
+// multicore settings
+#define STACK_DEPTH 8192
 
 // Potentiometer
 #define POTENTIOMETER_PIN 20
@@ -67,6 +71,7 @@ void showCurrentWaveType();
 
 // HC-SR04 functions
 unsigned int distanceToMidiNote(unsigned int distance);
+void pingTask(void *parameter);
 
 // Rotary encoder functions
 void rotaryControl();
@@ -80,6 +85,12 @@ volatile float currentFrequency = noteFrequencies[A4]; // A4 note
 volatile float phase = 0.0f;
 volatile int16_t volume = 3000; // -32768 to 32,767 for 16-bit audio
 volatile WaveType currentWaveType = SINE; // Default wave type
+int16_t buffer[SAMPLES * 2]; // stereo buffer (left + right)
+
+// note change by HC-SR04
+int stableNote = -1;
+int candidateNote = -1;
+int sameCount = 0;
 
 // flag to indicate if wave type has changed (for LCD update)
 bool isWaveTypeChanged = true; // initialize to true so that LCD shows wave type on startup
@@ -160,12 +171,17 @@ void setup() {
 
   // Initialize I2S for audio output
   i2sInit();
+  // sound test for 1sec
+  for(int i = 0; i < (AUDIO_SAMPLE_RATE / SAMPLES); i++) {
+    generateAudio();
+  }
   #if VERBOSE
     Serial.println("I2S initialized");
   #endif
 
   // Create audio task on core 0 (parallel to main loop)
-  // xTaskCreatePinnedToCore(audioTask, "Audio Task", 4096, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(audioTask, "Audio Task", STACK_DEPTH, NULL, 10, NULL, 1);
+  xTaskCreatePinnedToCore(pingTask, "Ping Task", 4096, NULL, 1, NULL, 0);
   #if VERBOSE
     Serial.println("Audio task created");
   #endif
@@ -254,26 +270,26 @@ void loop() {
     ble.playStopRequested = false;
   }
 
-  // change frequency based on distance measured by HC-SR04  
-  #if VERBOSE
-    unsigned int distance = sonar.ping_cm();
-    unsigned int midiNote = distanceToMidiNote(distance);
-    double frequency = noteFrequencies[midiNote];
+  // // change frequency based on distance measured by HC-SR04  
+  // #if VERBOSE
+  //   unsigned int distance = sonar.ping_cm();
+  //   unsigned int midiNote = distanceToMidiNote(distance);
+  //   double frequency = noteFrequencies[midiNote];
     
-    Serial.print("Distance: ");
-    Serial.print(distance);
-    Serial.print(" cm, MIDI Note: ");
-    Serial.print(midiNote);
-    Serial.print(", Frequency: ");
-    Serial.print(frequency);
-    Serial.println();
-    Serial.println();
-    currentFrequency = frequency;
-  #else
-    currentFrequency = noteFrequencies[distanceToMidiNote(sonar.ping_cm())];
-  #endif
+  //   Serial.print("Distance: ");
+  //   Serial.print(distance);
+  //   Serial.print(" cm, MIDI Note: ");
+  //   Serial.print(midiNote);
+  //   Serial.print(", Frequency: ");
+  //   Serial.print(frequency);
+  //   Serial.println();
+  //   Serial.println();
+  //   currentFrequency = frequency;
+  // #else
+  //   currentFrequency = noteFrequencies[distanceToMidiNote(sonar.ping_cm())];
+  // #endif
 
-
+  // generateAudio();
   // delay(100); // small delay to avoid flooding serial output
 }
 
@@ -324,8 +340,7 @@ int16_t generateSample(WaveType type, float phase, int16_t amplitude) {
 void generateAudio() {
   const int sampleRate = AUDIO_SAMPLE_RATE;
 
-  const int samples = 32; // number of samples per buffer
-  int16_t buffer[samples * 2]; // stereo buffer (left + right)
+  const int samples = SAMPLES; // number of samples per buffer
   float phaseStep = 2.0f * PI * currentFrequency / sampleRate;
 
   for (int i = 0; i < samples; i++) {
@@ -348,7 +363,7 @@ void generateAudio() {
 void audioTask(void *parameter) {
   while (true) {
     generateAudio();
-    vTaskDelay(1); // small delay to yield to other tasks (if needed)
+    // vTaskDelay(1); // small delay to yield to other tasks (if needed)
   }
 }
 
@@ -389,7 +404,27 @@ void showCurrentWaveType() {
 unsigned int distanceToMidiNote(unsigned int distance) {
   if (distance > MAX_DISTANCE) distance = MAX_DISTANCE; // cap at max distance
   else if (distance < MIN_DISTANCE) distance = MIN_DISTANCE; // cap at min distance
-  return map(distance, MIN_DISTANCE, MAX_DISTANCE, A0, C8); // A0 to C8 (piano range)
+  return map(distance, MIN_DISTANCE, MAX_DISTANCE, C2, C7); // C2 to C7 (61keys range)
+  // return map(distance, MIN_DISTANCE, MAX_DISTANCE, A0, C8); // A0 to C8 (88keys piano range)
+}
+
+void pingTask(void *parameter) {
+  while(true) {
+    int newNote = distanceToMidiNote(sonar.ping_cm());
+    if (newNote == candidateNote) {
+      sameCount++;
+    } else {
+      candidateNote = newNote;
+      sameCount = 1;
+    }
+
+    if (sameCount >= 3 && stableNote != candidateNote) {
+      stableNote = candidateNote;
+      currentFrequency = noteFrequencies[stableNote];
+    }
+    
+    vTaskDelay(20);
+  }
 }
 
 
