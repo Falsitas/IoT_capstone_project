@@ -2,11 +2,15 @@
 #define __TUNE_H__
 
 // MIDI note number for piano keys (A0 to C8)
-#define A0  21  // 88keys
-#define C2  36  // 61keys
-#define A4  69
-#define C7  96  // 61keys
-#define C8  108 // 88keys
+#define A_0  21  // 88keys
+#define C_2  36  // 61keys
+#define C_3  48  // 49keys
+#define C_4  60  // 25keys, 37keys
+#define A_4  69
+#define C_5  72
+#define C_6  84  // 25keys
+#define C_7  96  // 61keys, 37keys, 49keys
+#define C_8  108 // 88keys
 
 // Note frequencies for MIDI notes 0-127
 // index corresponds to MIDI note number, value is frequency in Hz
