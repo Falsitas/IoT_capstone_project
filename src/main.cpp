@@ -119,7 +119,7 @@ void playBackTask(void* parameter);
  * Global variables *
  ********************/
 // shared state variables for audio generation
-volatile float currentFrequency = noteFrequencies[A4]; // A4 note
+volatile float currentFrequency = noteFrequencies[A_4]; // A4 note
 volatile float phase = 0.0f;
 volatile int16_t volume = 3000; // -32768 to 32,767 for 16-bit audio
 volatile WaveType currentWaveType = SINE; // Default wave type

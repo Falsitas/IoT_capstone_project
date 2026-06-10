@@ -43,7 +43,7 @@ code .
 6. 즐겁게 연주!
 
 ## 3. 회로 구성
-<img src="./assets/img/circuit.png">
+<img src="./static/img/circuit.png">
 
 ### 3.1. 초음파센서 HC-SR04
 ```
