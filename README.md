@@ -5,6 +5,7 @@
 2. [준비](#2-준비)
 3. [회로 구성](#3-회로-구성)
 4. [기능 및 사용 방법](#4-기능-및-사용-방법)
+5. [데모 영상](#5-데모-영상)
 
 ## 1. 소개
 공중에서 연주가 가능한 간단한 에어 신디사이저
@@ -140,3 +141,21 @@ LED(red) ----- GPIO 36
 - Built-in LED: 블루투스 장치 연결 여부 표시. 연결 중 on
 - LED(red): 녹음 중 on
 - LED(green): 재생 중 on
+
+
+## 5. 데모 영상
+
+### 5.1. 초기화
+https://youtu.be/h7O7Kg7KRqI
+
+### 5.2. 연주
+https://youtu.be/QXxABLyBfZw
+
+### 5.3. 볼륨 조절
+https://youtu.be/3e9vKKUTo3k
+
+### 5.4. 음색 선택
+https://youtu.be/k4ApmdQB_4s
+
+### 5.5. 블루투스를 통한 녹음 및 재생
+https://youtube.com/shorts/i6SJIXGf_kY

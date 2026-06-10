@@ -142,10 +142,10 @@ int lastCLK;
 // ble-record
 bool isRecording = false;
 bool isPlaying = false;
+bool stopRequested = false;
 NoteEvent recorded[MAX_EVENTS];
 uint16_t eventCount = 0;
 uint32_t recordStartTime;
-TaskHandle_t playTaskHandler = NULL;
 
 // Initialize instances
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
@@ -563,7 +563,7 @@ void startPlayBack() {
   }
   isPlaying = true;
   digitalWrite(PLAYING_LED_PIN, HIGH);
-  xTaskCreatePinnedToCore(playBackTask, "Play Task", STACK_DEPTH, NULL, 1, &playTaskHandler, 1);
+  xTaskCreatePinnedToCore(playBackTask, "Play Task", STACK_DEPTH, NULL, 1, NULL, 1);
 }
 
 void stopPlayBack() {
@@ -572,18 +572,19 @@ void stopPlayBack() {
   #endif
   isPlaying = false;
   digitalWrite(PLAYING_LED_PIN, LOW);
-  vTaskDelete(playTaskHandler);
-  playTaskHandler = NULL;
+  stopRequested = true;
 }
 
 void playBackTask(void* parameter) {
   int currentCount = 0;
   while(currentCount < eventCount-1) {
+    if(stopRequested) break;
     playBackAudio(recorded[currentCount+1].timestamp - recorded[currentCount].timestamp, recorded[currentCount].note);
     currentCount++;
   }
   // end of playback
   isPlaying = false;
+  stopRequested = false;
   digitalWrite(PLAYING_LED_PIN, LOW);
   vTaskDelete(NULL);
 }
